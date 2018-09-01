@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
+blank = ( ' ', ',', ';' )
+
 def ReadNumList(string):
     List = []
     s = ''
     for i in range(len(string)):
-        if (string[i] == ' '):
+        if (string[i] in blank):
             List.append(int(s))
             s = ''
         elif (i == len(string)-1):
