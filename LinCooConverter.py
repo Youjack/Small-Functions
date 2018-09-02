@@ -2,6 +2,8 @@
 
 from NumListReader import ReadNumList
 
+# Ext = [ Ext(x), Ext(y), Ext(z), ... ]
+
 def ConvertToLinCoo(Ext, Coo):
     l = len(Ext)
     lExt = [ 1, ]
