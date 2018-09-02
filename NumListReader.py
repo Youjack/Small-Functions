@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-blank = ( ' ', ',', ';' )
-
 def ReadNumList(string):
+    blank = ( ' ', ',', ';' )
     List = []
     s = ''
     for i in range(len(string)):
