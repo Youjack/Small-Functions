@@ -5,10 +5,10 @@ def ReadNumList(string):
     List = []
     s = ''
     for i in range(len(string)):
-        if (string[i] in blank):
+        if string[i] in blank:
             List.append(int(s))
             s = ''
-        elif (i == len(string)-1):
+        elif i == len(string)-1:
             List.append(int(s+string[i]))
         else:
             s += string[i]

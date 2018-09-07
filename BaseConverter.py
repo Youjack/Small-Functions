@@ -22,6 +22,6 @@ if __name__ == '__main__':
     toDo = int(input('From =0 or To =1 ? : '))
     base = int(input('base = '))
     num = input('num = ')
-    if (toDo == 0): print(ConvertBaseFrom(base, num))
+    if toDo == 0: print(ConvertBaseFrom(base, num))
     else: print(ConvertBaseTo(base,num))
     input()
