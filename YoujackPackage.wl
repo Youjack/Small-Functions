@@ -14,15 +14,15 @@ WolframPlayer::usage = "WolframPlayer[expr]\nWolframPlyer[expr, name]";
 Begin["`Private`"];
 
 (* Styles *)
-$YoujackPlotColor = ColorData[68,"ColorList"];
+$YoujackPlotColor = ColorData[97,"ColorList"];
 (* SetAttributes[YoujackMathForm, HoldAll]; *)
-(* YoujackMathForm[expr_] = Style[TraditionalForm@HoldForm@expr, FontFamily->"Times"] *)
-ItalicStyle[expr_] = Style[expr, Italic, FontFamily->"Times"];
-PlainStyle[expr_] = Style[expr, Plain, FontFamily->"Times"];
-NumStyle[num_?NumberQ] = PlainStyle@num;
+(* YoujackMathForm[expr_] := Style[TraditionalForm@HoldForm@expr, FontFamily->"Times"] *)
+ItalicStyle[expr_] := Style[expr, Italic, FontFamily->"Times"];
+PlainStyle[expr_] := Style[expr, Plain, FontFamily->"Times"];
+NumStyle[num_?NumberQ] := PlainStyle@num;
 
 (* LinearFitPlot *)
-LinearFitPlot[labels_?ListQ,
+(* LinearFitPlot[labels_?ListQ,
     data_?ListQ, includeConstantBasis_?OptionQ,
     range_, axesQty_?ListQ, axesDim_?ListQ] :=
     Module[
@@ -57,6 +57,7 @@ LinearFitPlot[labels_?ListQ,
         (* Return *)
         {TableForm@info, figure}
     ];
+*)
 
 (* WolframPlayer *)
 WolframPlayer[expr_, name_?StringQ] := 

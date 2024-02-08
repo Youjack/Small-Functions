@@ -1,0 +1,83 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 13.3' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[      2477,         75]
+NotebookOptionsPosition[      1675,         58]
+NotebookOutlinePosition[      2136,         74]
+CellTagsIndexPosition[      2093,         71]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell[StyleData[StyleDefinitions -> "Default.nb"],ExpressionUUID->"74b5f411-b554-4689-9181-e1973ebab58d"],
+
+Cell[StyleData["Text"],
+ CellDingbat->"\[FilledSmallCircle]",
+ FontFamily->"Cambria Math",
+ FontSize->15,
+ FontWeight->"Normal",
+ FontSlant->"Plain",
+ FontTracking->"Plain",
+ FontVariations->{"StrikeThrough"->False,
+ "Underline"->False},
+ Background->None,ExpressionUUID->"6a4701c2-e220-44c5-9d01-262baa686257"],
+
+Cell[StyleData["Input"],
+ PageWidth->Infinity,
+ FontFamily->"Source Sans Pro",
+ FontSize->13,
+ FontWeight->"SemiBold",
+ FontSlant->"Plain",
+ FontTracking->"Plain",
+ FontVariations->{"Outline"->False,
+ "Shadow"->False,
+ "SquiggleStyle"->None,
+ "StrikeThrough"->False,
+ "Underline"->False},
+ Background->RGBColor[
+  0.9686274509803922, 0.9686274509803922, 
+   0.9686274509803922],ExpressionUUID->"a359db5a-d3d3-4d3e-bfb1-6a2d5275510f"],
+
+Cell[StyleData["Output"],
+ FontFamily->"Cambria Math",
+ FontSize->13,
+ FontWeight->"Normal",
+ FontSlant->"Plain",
+ FontTracking->"Plain",
+ FontVariations->{"StrikeThrough"->False,
+ "Underline"->False},ExpressionUUID->"a941efda-dc6a-4ff4-a10f-1b7223111a44"]
+},
+WindowSize->{582.8571428571428, 528.8571428571428},
+WindowMargins->{{Automatic, 96}, {32.14285714285711, Automatic}},
+FrontEndVersion->"13.3 for Microsoft Windows (64-bit) (July 24, 2023)",
+StyleDefinitions->"PrivateStylesheetFormatting.nb",
+ExpressionUUID->"f2c1fb50-4616-41e5-96af-dc81b00dc0e4"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[558, 20, 104, 0, 30, 49, 0, "StyleData", "StyleDefinitions", "",ExpressionUUID->"74b5f411-b554-4689-9181-e1973ebab58d"],
+Cell[665, 22, 311, 9, 49, 23, 0, "StyleData", "Text", "All",ExpressionUUID->"6a4701c2-e220-44c5-9d01-262baa686257"],
+Cell[979, 33, 433, 14, 64, 24, 0, "StyleData", "Input", "All",ExpressionUUID->"a359db5a-d3d3-4d3e-bfb1-6a2d5275510f"],
+Cell[1415, 49, 256, 7, 49, 25, 0, "StyleData", "Output", "All",ExpressionUUID->"a941efda-dc6a-4ff4-a10f-1b7223111a44"]
+}
+]
+*)
+
