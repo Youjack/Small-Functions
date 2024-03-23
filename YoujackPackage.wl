@@ -1,15 +1,19 @@
 BeginPackage["YoujackPackage`"];
 
+(* Styles *)
 ItalicStyle;
 PlainStyle;
 NumStyle;
 
-LinearFitPlot::usage = 
+(* LinearFitPlot *)
+LinearFitPlot::usage =
     "LinearFitPlot[{labels},
     {data}, IncludeConstantBasis->False,
     range, axesQty, axesDim]
     = {TableForm@info, figure}";
-WolframPlayer::usage = "WolframPlayer[expr]\nWolframPlyer[expr, name]";
+
+(* Wolfram Player *)
+WolframPlayer::usage = "WolframPlayer[expr]\nWolframPlayer[expr, name]";
 
 Begin["`Private`"];
 
@@ -22,7 +26,7 @@ PlainStyle[expr_] := Style[expr, Plain, FontFamily->"Times"];
 NumStyle[num_?NumberQ] := PlainStyle@num;
 
 (* LinearFitPlot *)
-(* LinearFitPlot[labels_?ListQ,
+LinearFitPlot[labels_?ListQ,
     data_?ListQ, includeConstantBasis_?OptionQ,
     range_, axesQty_?ListQ, axesDim_?ListQ] :=
     Module[
@@ -31,9 +35,9 @@ NumStyle[num_?NumberQ] := PlainStyle@num;
             model, func, info,
             color, listPlot, plot, axesLabel, figure
         },
-        
+
         len = Length@labels;
-        
+
         (* Fit *)
         model = Table[LinearModelFit[data[[n]], x,x, includeConstantBasis], {n,1,len}];
         func = Table[model[[n]]@"BestFit", {n,1,len}];
@@ -42,7 +46,7 @@ NumStyle[num_?NumberQ] := PlainStyle@num;
             func[[n]] /. {x->"x"},
             Row@{Superscript["R",2],"=",model[[n]]@"RSquared"}
         }, {n,1,len}];
-        
+
         (* Plot *)
         color = Table[$YoujackPlotColor[[n]], {n,1,len}];
         listPlot = ListPlot[data, PlotLegends->labels, PlotStyle->color];
@@ -53,16 +57,15 @@ NumStyle[num_?NumberQ] := PlainStyle@num;
         figure = Show[listPlot, plot,
             PlotRange->All, PlotRangePadding->None, AxesOrigin->{0,0},
             AxesLabel->axesLabel, GridLines->Automatic];
-        
+
         (* Return *)
         {TableForm@info, figure}
     ];
-*)
 
 (* WolframPlayer *)
-WolframPlayer[expr_, name_?StringQ] := 
+WolframPlayer[expr_, name_?StringQ] :=
     With[
-        { dir = Evaluate@FileNameJoin@{$HomeDirectory, "Documents", "Wolfram Player", name<>".cdf"} },
+        { dir = Evaluate@FileNameJoin@{$UserDocumentsDirectory, "Wolfram Player", name<>".cdf"} },
         Export[dir, #, "CDF"]& @ Notebook[{Cell[BoxData@ToBoxes@expr,"Output"]}, WindowSize->All];
         StartProcess@{"WolframPlayer", "\""<>dir<>"\""};
         ToString@Head@expr<>" in Wolfram Player"
