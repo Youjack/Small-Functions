@@ -5,9 +5,16 @@ BeginPackage["YoujackOneLoop`",{"FeynCalc`"}];
 Needs["FeynArts`"];
 $FAVerbose = 0;
 
+SetScatOptions::usage =
+  "Set options for calculating scattering amplitudes:
+  amplitudes are M without an \[ImaginaryI];
+  external lines are not truncated.";
+
 Set1PIOptions::usage =
-  "amplitudes are M without an \[ImaginaryI];
-  external lines are truncated.";
+  "Set options for calculating 1PIs:
+  amplitudes are M without an \[ImaginaryI];
+  external lines are truncated;
+  reducible diagrams are excluded.";
 
 AddMassRegulator::usage = 
   "AddMassRegulator[amp, m] add mass m to every massless propagator in amp.";
@@ -17,7 +24,7 @@ Z2d::usage =
   and expand di to first order.";
 
 DRCoupling::usage =
-  "DRCoupling[expr, g] replace the coupling g with 4\[Pi].";
+  "DRCoupling[expr, g, dimg] multiplies g by ((4\[Pi]\[ExponentialE]^-\[Gamma])^(-1/2)\[Mu])^dimg.";
 
 DRExpand::usage =
   "DRExpand[expr, dim] replaces D\[RightArrow]dim-2\[Epsilon] in expr,
@@ -26,7 +33,7 @@ DRExpand::usage =
 
 FCFPOneLoop::usage =
   "FCFPOneLoop[int, l, x] applies `FCFeynmanParametrize` to compute one-loop tensor integral.
-  (the final result have an implicit Feynman-parameters integral with Gamma[n])";
+  (the final result have an implicit Feynman-parameters integral with Gamma[b])";
 
 FPOneLoopDenom::usage =
   "FPOneLoopDenom[denom, l, x, \[CapitalDelta]] Feynman-parametrizes denom,
@@ -39,32 +46,47 @@ ReduceOneLoopNumr::usage =
 
 StdOneLoop::usage =
   "StdOneLoop[b, reducedNumr, \[CapitalDelta]] gives the standard one-loop integral.
-  (the final result have an implicit Feynman-parameters integral with Gamma[n])";
+  (the final result have an implicit Feynman-parameters integral with Gamma[b])";
 
-FPOneLoop::usage = 
+FPOneLoop::usage =
   "FPOneLoop[ampLoop, l, x, \[CapitalDelta]]
-  (the final result have an implicit Feynman-parameters integral with Gamma[n])";
+  (the final result have an implicit Feynman-parameters integral with Gamma[b])";
 
 FPIntegrate::usage =
-  "FPIntegrate[b, expr, x] integrates over b Feynman parameters x[i] in expr and multiplies Gamma[n].";
+  "FPIntegrate[b, expr, x] integrates over b Feynman parameters x[i] in expr and multiplies it by Gamma[n].";
 
 Begin["`Private`"];
 
-Set1PIOptions[] := (
-  $KeepLogDivergentScalelessIntegrals = True;
+$lorentzIndices = {Global`\[Mu], Global`\[Nu], Global`\[Rho], Global`\[Sigma]};
 
+(* set options *)
+(
+  SetOptions[Paint, Numbering -> Simple, SheetHeader -> None, ColumnsXRows -> {4, 1}];
+  SetOptions[Render, ImageSize -> {4 128, 128}];
+
+  SetOptions[CreateFeynAmp, PreFactor -> -I, GaugeRules -> {_FAGaugeXi -> 1}];
+
+  SetOptions[FCFAConvert, List -> False, SMP -> False,
+    LorentzIndexNames -> $lorentzIndices,
+    ChangeDimension -> D,
+    UndoChiralSplittings -> True, Contract -> True,
+    DropSumOver -> True];
+);
+SetScatOptions[] := (
+  SetOptions[CreateTopologies,
+    ExcludeTopologies -> {Tadpoles, WFCorrections, WFCorrectionCTs}];
+  SetOptions[CreateFeynAmp, Truncated -> False];
+);
+Set1PIOptions[] := (
   SetOptions[CreateTopologies,
     ExcludeTopologies -> {Tadpoles, WFCorrections, WFCorrectionCTs, Reducible}];
-  SetOptions[Paint, Numbering -> Simple, SheetHeader -> None, ColumnsXRows -> {2, 1}];
-  SetOptions[Render, ImageSize -> {2 128, 128}];
+  SetOptions[CreateFeynAmp, Truncated -> True];
 
-  SetOptions[CreateFeynAmp, PreFactor -> -I, Truncated -> True];
-  SetOptions[FCFAConvert, List -> False, SMP -> True,
-    LorentzIndexNames -> {Global`\[Mu], Global`\[Nu], Global`\[Rho], Global`\[Sigma]},
-    ChangeDimension -> D,
-    UndoChiralSplittings -> True, Contract -> True];
+  $KeepLogDivergentScalelessIntegrals = True;
   SetOptions[FCFeynmanParametrize, FeynmanIntegralPrefactor -> "Textbook"];
 );
+
+(* functions for lopp calculation *)
 
 AddMassRegulator[amp_, m_] :=
   ReplaceAll[amp, PropagatorDenominator[p_, 0] :> PropagatorDenominator[p, m]];
@@ -76,8 +98,8 @@ Z2d[expr_, ZList_List] := Module[{\[Alpha]},
     Collect[#, (#[[2]]) & /@ ZList, Simplify] &
 ];
 
-DRCoupling[expr_, g_] :=
-  ReplaceAll[expr, g -> g ((4 Pi E^-EulerGamma)^(-1/2) ScaleMu)^Epsilon];
+DRCoupling[expr_, g_, dimg_] :=
+  ReplaceAll[expr, g -> g ((4 Pi E^-EulerGamma)^(-1/2) ScaleMu)^dimg];
 
 DRExpand[expr_, dim_] :=
   FCReplaceD[expr, D -> dim - 2 Epsilon] //
@@ -109,36 +131,45 @@ FPOneLoopDenom[denom_, l_, x_, \[CapitalDelta]_] := Module[
   { momPart, massPart } = FCI[denom] // Apply[List, #, {0,1}] & // Transpose;
   b = Length@momPart;
   DataType[x, FCVariable] = True;
-  xSum = Plus @@ Table[
+  xSum = Sum[
     DataType[x[i], FCVariable] = True;
     x[i], {i, 1, b}];
   (* Feynman parametrizes `momPart` and separates it into `lPart` and `\[CapitalDelta]mom` *)
   { lPart, \[CapitalDelta]mom } = MapIndexed[SPD[#1] Apply[x][#2] &, momPart] //
     Apply[Plus] // CompleteSquare[#, l] & // ReplaceAll[xSum -> 1] //
-    {SelectNotFree[#, l], SelectFree[#, l]} &;
+    {SelectNotFree2[#, l], SelectFree2[#, l]} &;
   (* Feynman parametrizes `massPart` to `\[CapitalDelta]mass` *)
   \[CapitalDelta]mass = MapIndexed[#1^2 Apply[x][#2] &, massPart] // Apply[Plus];
   (* return the results : ( l^2 - \[CapitalDelta] )^b *)
-  { l -> l - (lPart[[1]] // SelectFree[#, l] & // Simplify),
+  { l -> l - (lPart[[1]] // SelectFree2[#, l] & //
+      ReplaceAll[Momentum[p_,___] -> p] // Simplify),
     \[CapitalDelta] -> - \[CapitalDelta]mom + \[CapitalDelta]mass //
       ExpandScalarProduct // FullSimplify[#, Assumptions -> xSum == 1] &,
     b }
 ];
 
 ReduceOneLoopNumr::notsupp = "Not supported tensor `1`.";
-ReduceOneLoopNumr[numr_, lRule_] := Module[
+ReduceOneLoopNumr[numr_, lRule_Rule] := Module[
   { l = lRule[[1]] },
   FCI[numr] //
+    SUNSimplify //
     (* translate `l` *)
-    ReplaceAll[lRule] //
-    (* decompose `numr` into {power of `l`,prefactor} *)
-    DiracSimplify //
-    Uncontract[#, l, Pair -> {l}] & //
-    Collect2[#, l] & // If[Head@# === Plus, List@@#, List@#] & //
-    Map[{SelectNotFree[#, l], SelectFree[#, l] // Simplify} &] //
+    FCReplaceMomenta[#, {lRule}] & //
+    (* decompose `numr` into {power of `l`, prefactor} *)
+    Append[
+      # // FCTraceExpand // DiracGammaExpand // DotExpand // ExpandScalarProduct // Expand //
+        SelectNotFree2[#, l] & //
+        DiracSimplify // Simplify //
+        Uncontract[#, l, Pair -> {l}] & //
+        Collect2[#, l] & //
+        If[Head@# === Plus, List@@#, List@#] & //
+        Map[{SelectNotFree[#, l], SelectFree[#, l] // Simplify} &],
+      { 1, FCReplaceMomenta[#, {l -> 0}] } (* const part of `numr` is not simplified *)
+    ] & //
     (* reduce tensors of `l` *)
     Map@ReplaceAll@{
       (* Note the args in `Pair` are in alphabetical order! *)
+      {0, _} -> Nothing,
       {1, pref_} :> {1, pref},
       {Pair[LorentzIndex[__], M_], _} -> Nothing,
       {Pair[LI1_, M1_] Pair[LI2_, M2_], pref_} :> {FCI@SPD[l], Pair[LI1,LI2]/D pref // Contract},
@@ -169,9 +200,10 @@ FPOneLoop[ampLoop_, l_, x_, \[CapitalDelta]_] := Module[
   { denom, numr } = {
     SelectNotFree[#, FeynAmpDenominator],
     SelectFree[#, FeynAmpDenominator]
-  } & @ FCI[ampLoop];
+  } & @ Collect[FCI[ampLoop], FeynAmpDenominator[__]];
   FPdenom = FPOneLoopDenom[denom, l, x, \[CapitalDelta]];
-  reducedNumr = ReduceOneLoopNumr[numr, FPdenom[[1]]];
+  reducedNumr = ReduceOneLoopNumr[numr, FPdenom[[1]]] //
+    Map[MapAt[Calc /* Simplify, #, 2] &];
   { StdOneLoop[FPdenom[[3]], reducedNumr, \[CapitalDelta]],
     FPdenom[[2]] }
 ];
