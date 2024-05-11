@@ -25,11 +25,18 @@ Z2d::usage =
 
 DRCoupling::usage =
   "DRCoupling[expr, g, dimg] multiplies g by ((4\[Pi]\[ExponentialE]^-\[Gamma])^(-1/2)\[Mu])^dimg.";
+DRCoupling\[Prime]::usage =
+  "DRCoupling\[Prime][expr, g, dimg] multiplies g by \[Mu]^dimg.";
 
 DRExpand::usage =
   "DRExpand[expr, dim] replaces D\[RightArrow]dim-2\[Epsilon] in expr,
   expands expr with respect to \[Epsilon],
-  and puts terms of different order into a List.";
+  and returns {\[Epsilon] dependent part, \[Epsilon] independent part}.";
+
+DRExpandScaleless::usage =
+  "DRExpandScaleless[expr, dim, zero\[CapitalDelta]] replaces D \[RightArrow] dim-2\[Epsilon] in expr,
+  then replaces zero\[CapitalDelta]^-Epsilon \[RightArrow] Epsilon(1/EpsilonUV - 1/EpsilonIR).
+  The return format is the same as DRExpand.";
 
 FCFPOneLoop::usage =
   "FCFPOneLoop[int, l, x] applies `FCFeynmanParametrize` to compute one-loop tensor integral.
@@ -40,9 +47,9 @@ FPOneLoopDenom::usage =
   and return {l\[RightArrow]shifted l, \[CapitalDelta]\[RightArrow]..., power of denom}.";
 
 ReduceOneLoopNumr::usage =
-  "ReduceOneLoopNumr[numr, lRule] shifts loop momentum in numr using lRule,
+  "ReduceOneLoopNumr[numr, lRule] shifts loop momentum in numr according to lRule,
   reduces the loop-momentum tensors to scalars,
-  and return {{loop-momentum scalar1,prefactor1},...}.";
+  and returns {{a1 in (l^2)^a1, prefactor1},...}.";
 
 StdOneLoop::usage =
   "StdOneLoop[b, reducedNumr, \[CapitalDelta]] gives the standard one-loop integral.
@@ -100,12 +107,29 @@ Z2d[expr_, ZList_List] := Module[{\[Alpha]},
 
 DRCoupling[expr_, g_, dimg_] :=
   ReplaceAll[expr, g -> g ((4 Pi E^-EulerGamma)^(-1/2) ScaleMu)^dimg];
+DRCoupling\[Prime][expr_, g_, dimg_] :=
+  ReplaceAll[expr, g -> g ScaleMu^dimg];
 
 DRExpand[expr_, dim_] :=
   FCReplaceD[expr, D -> dim - 2 Epsilon] //
-  Series[#, {Epsilon, 0, 0}] & //
-  Table[#[[3,n]] Epsilon^(#[[4]] + n - 1), {n,1,Length@#[[3]]}] & //
-  Simplify;
+  Normal@Series[#, {Epsilon,0,0}] & //
+  {SelectNotFree2[#, Epsilon], SelectFree2[#, Epsilon]} & // Simplify;
+
+DRExpandScaleless[expr_, dim_, zero\[CapitalDelta]_] :=
+  expr // Collect[#, zero\[CapitalDelta], Simplify] & //
+  If[Head@# === Plus, List@@#, List@#] & // Map[
+    Switch[
+      SelectNotFree[#, zero\[CapitalDelta]] /. {zero\[CapitalDelta]^n_ :> n, 1 -> 0} /.
+        D -> 4 - 2 Epsilon // Simplify,
+      0, {0,#},
+      -Epsilon,
+        SelectFree[#, zero\[CapitalDelta]] //
+        FCReplaceD[#, D -> dim - 2 Epsilon] & // Simplify //
+        Normal@Series[Epsilon #, {Epsilon,0,0}] & //
+        { # / Epsilon, - # / EpsilonIR } &,
+      _, {0,0}
+    ]&
+  ] // Apply[Plus];
 
 FCFPOneLoop[int_, l_, x_] := Module[
   {tensorIntList, FPList},
@@ -152,68 +176,69 @@ ReduceOneLoopNumr::notsupp = "Not supported tensor `1`.";
 ReduceOneLoopNumr[numr_, lRule_Rule] := Module[
   { l = lRule[[1]] },
   FCI[numr] //
-    SUNSimplify //
-    (* translate `l` *)
-    FCReplaceMomenta[#, {lRule}] & //
-    (* decompose `numr` into {power of `l`, prefactor} *)
-    Append[
-      # // FCTraceExpand // DiracGammaExpand // DotExpand // ExpandScalarProduct // Expand //
-        SelectNotFree2[#, l] & //
-        DiracSimplify // Simplify //
-        Uncontract[#, l, Pair -> {l}] & //
-        Collect2[#, l] & //
-        If[Head@# === Plus, List@@#, List@#] & //
-        Map[{SelectNotFree[#, l], SelectFree[#, l] // Simplify} &],
-      { 1, FCReplaceMomenta[#, {l -> 0}] } (* const part of `numr` is not simplified *)
-    ] & //
-    (* reduce tensors of `l` *)
-    Map@ReplaceAll@{
-      (* Note the args in `Pair` are in alphabetical order! *)
-      {0, _} -> Nothing,
-      {1, pref_} :> {1, pref},
-      {Pair[LorentzIndex[__], M_], _} -> Nothing,
-      {Pair[LI1_, M1_] Pair[LI2_, M2_], pref_} :> {FCI@SPD[l], Pair[LI1,LI2]/D pref // Contract},
-      {n_, _} :> (Message[ReduceOneLoopNumr::notsupp, n]; Abort[])
-    } //
-    (* collect terms of the same power of `l` *)
-    GatherBy[#, First] & //
-    Map[{#[[1, 1]], Plus@@(Transpose[#][[2]]) // Simplify} &]
+  SUNSimplify //
+  (* translate `l` *)
+  FCReplaceMomenta[#, {lRule}] & //
+  (* decompose `numr` into {tensor of `l`, prefactor} *)
+  Append[
+    (* non-const part *)
+    # // FCTraceExpand // DiracGammaExpand // DotExpand // ExpandScalarProduct // Expand //
+      SelectNotFree2[#, l] & //
+      DiracSimplify // Simplify //
+      Uncontract[#, l, Pair -> {l}] & //
+      Collect2[#, l] & //
+      If[Head@# === Plus, List@@#, List@#] & //
+      Map[{SelectNotFree[#, l], SelectFree[#, l] // Simplify} &],
+    (* const part, not simplified *)
+    { 1, FCReplaceMomenta[#, {l -> 0}] }
+  ] & //
+  (* reduce tensors of `l` and return the power `a` of '(l^2)^a' *)
+  Map@ReplaceAll@{
+    (* Note the args in `Pair` are in alphabetical order! *)
+    {0, _} -> Nothing, (* this case happens in scalar integrals *)
+    {1, pref_} :> {0, pref},
+    {Pair[LorentzIndex[__], M_], _} -> Nothing,
+    {Pair[LI1_, M1_] Pair[LI2_, M2_], pref_} :> {1, Pair[LI1,LI2]/D pref // Contract},
+    {Pair[p1__] Pair[p2__] Pair[p3__], _} -> Nothing,
+    {n_, pref_} :> (Message[ReduceOneLoopNumr::notsupp, n]; {n, pref})
+  } //
+  (* collect terms of the same power of `l` *)
+  GatherBy[#, First] & //
+  Map[{#[[1, 1]], Plus@@(Transpose[#][[2]]) // Simplify} &]
 ];
 
-StdOneLoop::notsupp = "Not supported numerator `1`.";
 StdOneLoop[b_, reducedNumr_, \[CapitalDelta]_] :=
   FCI[reducedNumr] //
-    (* calculate the standard one-loop integral *)
-    Map@Replace@{
-      {1, pref_} :>
-        I (-1)^(b  ) \[CapitalDelta]^(D/2-b  )/(4\[Pi])^(D/2) Gamma[-D/2+b]/Gamma[b] pref,
-      {Pair[__], pref_} :>
-        I (-1)^(b+1) \[CapitalDelta]^(D/2-b+1)/(4\[Pi])^(D/2) D/2 Gamma[-D/2+b-1]/Gamma[b] pref,
-      {n_, _} :> (Message[StdOneLoop::notsupp, n]; Abort[])
-    } //
-    (* gather the results *)
-    Map[Apply[Times]] // Apply[Plus] // Simplify;
+  If[Head[#[[1]]] =!= List, {#}, #] & //
+  (* calculate the standard one-loop integral *)
+  Map@Replace[
+    {a_, pref_} :>
+      I (-1)^(a-b) / (4Pi)^(D/2) \[CapitalDelta]^(D/2+a-b) *
+      Gamma[-D/2-a+b] Gamma[D/2+a] /( Gamma[b] Gamma[D/2] ) pref
+  ] //
+  (* gather the results *)
+  Map[Apply[Times]] // Apply[Plus] // Simplify;
 
 FPOneLoop[ampLoop_, l_, x_, \[CapitalDelta]_] := Module[
   { denom, numr,
-    FPdenom, reducedNumr },
+    FPDenom, reducedNumr },
   { denom, numr } = {
     SelectNotFree[#, FeynAmpDenominator],
     SelectFree[#, FeynAmpDenominator]
   } & @ Collect[FCI[ampLoop], FeynAmpDenominator[__]];
-  FPdenom = FPOneLoopDenom[denom, l, x, \[CapitalDelta]];
-  reducedNumr = ReduceOneLoopNumr[numr, FPdenom[[1]]] //
+  FPDenom = FPOneLoopDenom[denom, l, x, \[CapitalDelta]];
+  reducedNumr = ReduceOneLoopNumr[numr, FPDenom[[1]]] //
     Map[MapAt[Calc /* Simplify, #, 2] &];
-  { StdOneLoop[FPdenom[[3]], reducedNumr, \[CapitalDelta]],
-    FPdenom[[2]] }
+  { StdOneLoop[FPDenom[[3]], reducedNumr, \[CapitalDelta]],
+    FPDenom[[2]] }
 ];
 
-FPIntegrate[b_, expr_, x_] := Module[
+FPIntegrate[b_, expr_, x_, opts___?OptionQ] := Module[
   { xSum, int },
   xSum[n_] := Plus @@ Table[x[i], {i, 1, n}];
   int = expr /. x[b] -> 1 - xSum[b - 1];
   For[i = b - 1, i > 0, i--,
-    int = Integrate[int, {x[i], 0, 1 - xSum[i - 1]}]
+    int = Integrate[int, {x[i], 0, 1 - xSum[i - 1]}, opts]
   ];
   Gamma[b] int
 ];
