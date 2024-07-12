@@ -24,18 +24,24 @@ Z2d::usage =
   and expand di to first order.";
 
 DRCoupling::usage =
-  "DRCoupling[expr, g, dimg] multiplies g by ((4\[Pi]\[ExponentialE]^-\[Gamma])^(-1/2)\[Mu])^dimg.";
+  "DRCoupling[expr, g, dimg] multiplies g by ((4\[Pi]\[ExponentialE]^-\[Gamma])^(-1/2)\[Mu])^dimg.
+  (can only be applied to dimensionless couplings)";
 DRCoupling\[Prime]::usage =
-  "DRCoupling\[Prime][expr, g, dimg] multiplies g by \[Mu]^dimg.";
+  "DRCoupling\[Prime][expr, g, dimg] multiplies g by \[Mu]^dimg.
+  (can only be applied to dimensionless couplings)";
+
+BetaFromZ::usage =
+  "BetaFromZ[ZgMS, g, dimg] calculates the beta function of g from ZgMS.
+  (can only be applied to dimensionless couplings)";
 
 DRExpand::usage =
-  "DRExpand[expr, dim] replaces D\[RightArrow]dim-2\[Epsilon] in expr,
+  "DRExpand[expr, dim] replaces D\[Rule]dim-2\[Epsilon] in expr,
   expands expr with respect to \[Epsilon],
   and returns {\[Epsilon] dependent part, \[Epsilon] independent part}.";
 
 DRExpandScaleless::usage =
-  "DRExpandScaleless[expr, dim, zero\[CapitalDelta]] replaces D \[RightArrow] dim-2\[Epsilon] in expr,
-  then replaces zero\[CapitalDelta]^-Epsilon \[RightArrow] Epsilon(1/EpsilonUV - 1/EpsilonIR).
+  "DRExpandScaleless[expr, dim, zero\[CapitalDelta]] replaces D \[Rule] dim-2\[Epsilon] in expr,
+  then replaces zero\[CapitalDelta]^-Epsilon \[Rule] Epsilon(1/EpsilonUV - 1/EpsilonIR).
   The return format is the same as DRExpand.";
 
 FCFPOneLoop::usage =
@@ -44,7 +50,7 @@ FCFPOneLoop::usage =
 
 FPOneLoopDenom::usage =
   "FPOneLoopDenom[denom, l, x, \[CapitalDelta]] Feynman-parametrizes denom,
-  and return {l\[RightArrow]shifted l, \[CapitalDelta]\[RightArrow]..., power of denom}.";
+  and return {l\[Rule]shifted l, \[CapitalDelta]\[Rule]..., power of denom}.";
 
 ReduceOneLoopNumr::usage =
   "ReduceOneLoopNumr[numr, lRule] shifts loop momentum in numr according to lRule,
@@ -60,11 +66,13 @@ FPOneLoop::usage =
   (the final result have an implicit Feynman-parameters integral with Gamma[b])";
 
 FPIntegrate::usage =
-  "FPIntegrate[b, expr, x] integrates over b Feynman parameters x[i] in expr and multiplies it by Gamma[n].";
+  "FPIntegrate[b, expr, x] integrates over b Feynman parameters x[i] in expr
+  and multiplies it by Gamma[n].";
 
-Begin["`Private`"];
+Begin["`Private`"]; (*----------------------------------------------------------------------------*)
 
-$lorentzIndices = {Global`\[Mu], Global`\[Nu], Global`\[Rho], Global`\[Sigma]};
+$lorentzIndices = {Global`\[Mu], Global`\[Nu], Global`\[Rho], Global`\[Sigma],
+  Global`\[Kappa], Global`\[Lambda]};
 
 (* set options *)
 (
@@ -109,6 +117,13 @@ DRCoupling[expr_, g_, dimg_] :=
   ReplaceAll[expr, g -> g ((4 Pi E^-EulerGamma)^(-1/2) ScaleMu)^dimg];
 DRCoupling\[Prime][expr_, g_, dimg_] :=
   ReplaceAll[expr, g -> g ScaleMu^dimg];
+
+BetaFromZ[ZgMS_, g_, dimg_] := Module[
+  {dimg\[Prime], C1},
+  dimg\[Prime] = ((dimg /. D -> D - 2Epsilon) - dimg // Simplify) / Epsilon;
+  C1 = g Series[ZgMS - 1, {Epsilon, Infinity, 1}][[3,1]];
+  - Epsilon dimg\[Prime] g - dimg\[Prime] C1 + dimg\[Prime] g D[C1, g]
+]
 
 DRExpand[expr_, dim_] :=
   FCReplaceD[expr, D -> dim - 2 Epsilon] //
@@ -166,7 +181,7 @@ FPOneLoopDenom[denom_, l_, x_, \[CapitalDelta]_] := Module[
   \[CapitalDelta]mass = MapIndexed[#1^2 Apply[x][#2] &, massPart] // Apply[Plus];
   (* return the results : ( l^2 - \[CapitalDelta] )^b *)
   { l -> l - (lPart[[1]] // SelectFree2[#, l] & //
-      ReplaceAll[Momentum[p_,___] -> p] // Simplify),
+      ReplaceAll[Momentum[p_,___] :> p] // Simplify),
     \[CapitalDelta] -> - \[CapitalDelta]mom + \[CapitalDelta]mass //
       ExpandScalarProduct // FullSimplify[#, Assumptions -> xSum == 1] &,
     b }
@@ -200,6 +215,10 @@ ReduceOneLoopNumr[numr_, lRule_Rule] := Module[
     {Pair[LorentzIndex[__], M_], _} -> Nothing,
     {Pair[LI1_, M1_] Pair[LI2_, M2_], pref_} :> {1, Pair[LI1,LI2]/D pref // Contract},
     {Pair[p1__] Pair[p2__] Pair[p3__], _} -> Nothing,
+    {Pair[LI1_, M1_] Pair[LI2_, M2_] Pair[LI3_, M3_] Pair[LI4_, M4_], pref_} :> {2,
+      (Pair[LI1,LI2] Pair[LI3,LI4] + Pair[LI1,LI3] Pair[LI2,LI4] + Pair[LI1,LI4] Pair[LI3,LI2]) /
+      (D(D+2)) pref // Contract},
+    {Pair[p1__] Pair[p2__] Pair[p3__] Pair[p4__] Pair[p5__], _} -> Nothing,
     {n_, pref_} :> (Message[ReduceOneLoopNumr::notsupp, n]; {n, pref})
   } //
   (* collect terms of the same power of `l` *)
@@ -244,5 +263,64 @@ FPIntegrate[b_, expr_, x_, opts___?OptionQ] := Module[
 ];
 
 End[];
+
+BeginPackage["YoujackOneLoop`FormFactorTools`"]; (*===============================================*)
+Needs["FeynCalc`"];
+
+DecomposeOSVertex::usage =
+  "DecomposeOSVertex[expr, spinorL, spinorR, qin] contracts expr as spinorL.expr.spinorR,
+  simplies it with Gordon identity, then removes the spinors,
+  and returns {terms with \[Gamma], terms with \[Sigma], other terms}.
+  (qin is the momentum of the incoming photon)";
+
+Begin["`Private`"];
+
+DecomposeOSVertex[expr_, spinorL_, spinorR_, qin_] := Module[
+  { momL, momR, m, pp },
+  momL = FCI[spinorL][[1]]; momR = FCI[spinorR][[1]];
+  m = FCI[spinorL][[2]];
+  expr //
+    spinorL.#.spinorR & // DiracSimplify // Simplify //
+    ReplaceAll@{Spinor[__].Spinor[__] -> 1, Spinor[__] -> Sequence[]} //
+    ReplaceAll@{
+      momR -> Momentum[(pp - qin)/2, D], -momR -> -Momentum[(pp - qin)/2, D],
+      momL -> Momentum[(pp + qin)/2, D], -momL -> -Momentum[(pp + qin)/2, D]
+    } // ExpandScalarProduct // Simplify //
+    ReplaceAll[FCI@FVD[pp, LI_] :>
+      2 m GAD[LI] - I DiracSigma[GAD[LI], GSD[qin]] (* Gordon identity *)
+    ] // ExpandScalarProduct //
+    { SelectNotFree2[SelectFree2[#, DiracSigma], DiracGamma] // Simplify,
+      SelectNotFree2[#, DiracSigma] // Simplify,
+      SelectFree2[#, DiracGamma, DiracSigma] // Simplify } &
+];
+
+End[];
+
+EndPackage[];
+
+BeginPackage["YoujackOneLoop`DiracGammaTools`"]; (*===============================================*)
+Needs["FeynCalc`"];
+
+DiracDecompose::usage =
+  "DiracDecompose[expr] decomposes the product of Dirac gamma matrices in terms of the conventional basis.";
+
+Begin["`Private`"];
+
+DiracDecompose[expr_] := Module[
+  {LI1, LI2},
+                                  1/4 DiracTrace[                              expr] +
+      GA[LI1]                     1/4 DiracTrace[GA[LI1]                     . expr] +
+      GA5                         1/4 DiracTrace[GA5                         . expr] +
+      GA[LI1].GA5                 1/4 DiracTrace[GA5.GA[LI1]                 . expr] +
+  1/2 DiracSigma[GA[LI1],GA[LI2]] 1/4 DiracTrace[DiracSigma[GA[LI1],GA[LI2]] . expr] //
+    DiracSubstitute67 // DiracSimplify[#, ToDiracGamma67->False] & // FCE //
+    ReplaceAll[GA[LI1_?(#=!=5&)].GA[LI2_?(#=!=5&)] :>
+      ToDiracSigma[GA[LI1].GA[LI2], GA[LI1], GA[LI2]]] //
+    FullSimplify // Expand
+];
+
+End[];
+
+EndPackage[];
 
 EndPackage[];
