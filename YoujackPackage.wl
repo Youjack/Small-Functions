@@ -77,7 +77,7 @@ WolframPlayer[expr_] := WolframPlayer[expr, CreateUUID["CDFOutput-"]];
 (* InteractiveMapAt *)
 InteractiveMapAt::wrongsize = "The argument list has a wrong size.";
 InteractiveMapAt::backat0 = "Already back to depth\[Hyphen]0.";
-InteractiveMapAt[fSeq___][expr_] := Module[
+InteractiveMapAt[fSeq___, OptionsPattern[{Print -> True}]][expr_] := Module[
   {
     fList, fListLen,
     exprList, posList, exprP, fexprP, posString
@@ -116,10 +116,10 @@ InteractiveMapAt[fSeq___][expr_] := Module[
         AppendTo[posList, fList[[2i-1]]];
       )
     ];
-    Print @@
+    If[OptionValue[Print], Print @@
       posString ~Join~ {Head@exprP, List@@exprP} ~Join~
       If[fList[[2 i]] === Identity, {},
-        {" \[Rule] ", Head@fexprP, List@@fexprP}],
+        {" \[Rule] ", Head@fexprP, List@@fexprP}] ],
     {i, fListLen/2}];
   Do[
     exprList[[i]] = Head[exprList[[i]]][

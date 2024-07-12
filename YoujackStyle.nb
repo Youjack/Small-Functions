@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       158,          7]
-NotebookDataLength[      2477,         75]
-NotebookOptionsPosition[      1675,         58]
-NotebookOutlinePosition[      2136,         74]
-CellTagsIndexPosition[      2093,         71]
+NotebookDataLength[      3005,         89]
+NotebookOptionsPosition[      2064,         70]
+NotebookOutlinePosition[      2545,         87]
+CellTagsIndexPosition[      2502,         84]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -54,10 +54,23 @@ Cell[StyleData["Output"],
  FontSlant->"Plain",
  FontTracking->"Plain",
  FontVariations->{"StrikeThrough"->False,
- "Underline"->False},ExpressionUUID->"a941efda-dc6a-4ff4-a10f-1b7223111a44"]
+ "Underline"->False},ExpressionUUID->"a941efda-dc6a-4ff4-a10f-1b7223111a44"],
+
+Cell[StyleData["Code"],
+ StyleHints-><|
+  "CodeFont" -> "Cascadia Code", "GroupOpener" -> "Inline", "GearMenu" -> 
+   False, "OperatorRenderings" -> ""|>,
+ FontFamily->"Cascadia Code",
+ FontSize->12,
+ FontWeight->"Normal",
+ FontSlant->"Plain",
+ FontTracking->"Plain",
+ FontVariations->{"StrikeThrough"->False,
+ "Underline"->False},ExpressionUUID->"84ad1edc-9363-40c6-9e91-a49a6f11b4c9"]
 },
 WindowSize->{582.8571428571428, 528.8571428571428},
-WindowMargins->{{Automatic, 96}, {32.14285714285711, Automatic}},
+WindowMargins->{{Automatic, 68.14285714285711}, {
+  40.285714285714334`, Automatic}},
 FrontEndVersion->"13.3 for Microsoft Windows (64-bit) (July 24, 2023)",
 StyleDefinitions->"PrivateStylesheetFormatting.nb",
 ExpressionUUID->"f2c1fb50-4616-41e5-96af-dc81b00dc0e4"
@@ -76,7 +89,8 @@ Notebook[{
 Cell[558, 20, 104, 0, 30, 49, 0, "StyleData", "StyleDefinitions", "",ExpressionUUID->"74b5f411-b554-4689-9181-e1973ebab58d"],
 Cell[665, 22, 311, 9, 49, 23, 0, "StyleData", "Text", "All",ExpressionUUID->"6a4701c2-e220-44c5-9d01-262baa686257"],
 Cell[979, 33, 433, 14, 64, 24, 0, "StyleData", "Input", "All",ExpressionUUID->"a359db5a-d3d3-4d3e-bfb1-6a2d5275510f"],
-Cell[1415, 49, 256, 7, 49, 25, 0, "StyleData", "Output", "All",ExpressionUUID->"a941efda-dc6a-4ff4-a10f-1b7223111a44"]
+Cell[1415, 49, 256, 7, 49, 25, 0, "StyleData", "Output", "All",ExpressionUUID->"a941efda-dc6a-4ff4-a10f-1b7223111a44"],
+Cell[1674, 58, 386, 10, 69, 23, 0, "StyleData", "Code", "All",ExpressionUUID->"84ad1edc-9363-40c6-9e91-a49a6f11b4c9"]
 }
 ]
 *)
