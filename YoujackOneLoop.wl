@@ -36,11 +36,15 @@ BetaFromZ::usage =
 (* dimensional regularization *)
 
 DRCoupling::usage =
-  "DRCoupling[expr, g, dimg] multiplies g by ((4\[Pi]\[ExponentialE]^-\[Gamma])^(-1/2)\[Mu])^dimg.
+  "DRCoupling[expr, g, dimg] multiplies g by (\[ExponentialE]^\[Gamma]\[Mu]/(4\[Pi]))^(dimg/2).
   (can only be applied to dimensionless couplings)";
 DRCoupling\[Prime]::usage =
   "DRCoupling\[Prime][expr, g, dimg] multiplies g by \[Mu]^dimg.
   (can only be applied to dimensionless couplings)";
+
+DRAddScaleMu::usage =
+  "DRAddScaleMu[expr, dim, \[CapitalDelta], eps:\[Epsilon]] replaces D\[Rule]dim-2\[Epsilon] in expr,
+  then replaces \[CapitalDelta]^(-\[Epsilon])\[Rule](\[ExponentialE]^\[Gamma] \[Mu]^2/(4\[Pi]\[CapitalDelta]))^\[Epsilon]";
 
 DRExpand::usage =
   "DRExpand[expr, dim] replaces D\[Rule]dim-2\[Epsilon] in expr,
@@ -82,11 +86,14 @@ FPIntegrate::usage =
 (* PlusDistribution *)
 
 PlusDistributionExplicit::usage =
-  "PlusDistributionExplicit[F, x] explicitly calculates PlusDistribution[F] of variable x";
+  "PlusDistributionExplicit[expr, x] explicitly calculates PlusDistributions of variable x in expr";
 
 PlusDistributionExpand::usage =
-  "PlusDistributionExpand[expr, x] expands PlusDistribution[expr] of variable x
-  with respect to Log[1-x]^n/(1-x).";
+  "PlusDistributionExpand[expr, x] expands PlusDistributions of variable x in expr
+  with in terms of PlusDistribution[Log[1-x]^n/(1-x)].";
+
+PlusDistributionIntegrate::usage =
+  "PlusDistributionIntegrate[expr, x] integrates expr (may involve PlusDistributions) w.r.t x from 0 to 1."
 
 Begin["`Private`"]; (*----------------------------------------------------------------------------*)
 
@@ -124,6 +131,8 @@ Set1PIOptions[] := (
 
 PlusToList[sum_] := 
   If[sum === 0, {}, If[Head@sum === Plus, List@@sum, List@sum]];
+TimesToList[prod_] := 
+  If[prod === 0, {}, If[Head@prod === Times, List@@prod, List@prod]];
 
 LogCombine[expr_, factor_ : 1] := Module[
   {noLog, haveLog, logList},
@@ -157,9 +166,17 @@ BetaFromZ[ZgMS_, g_, dimg_] := Module[
 (* dimensional regularization *)
 
 DRCoupling[expr_, g_, dimg_] :=
-  expr /. g -> g ((4 Pi E^-EulerGamma)^(-1/2) ScaleMu)^dimg;
+  expr /. g -> g ((E^EulerGamma ScaleMu^2)/(4 Pi))^(dimg/2);
 DRCoupling\[Prime][expr_, g_, dimg_] :=
-  expr /. g -> g ScaleMu^dimg;
+  expr /. g -> g (ScaleMu^2)^(dimg/2);
+
+DRAddScaleMu[expr_, dim_, Delta_, eps_:Epsilon] :=
+  FCReplaceD[expr, D -> dim - 2 eps] // Simplify //
+  (* to deal with nonsymbol Deltas, Exponent is not suitable here *)
+  ReplaceAll[{
+    Delta^(     b_ * eps) /; b<0 :>           ((E^EulerGamma ScaleMu^2)/(4 Pi Delta))^(-b eps),
+    Delta^(a_ + b_ * eps) /; b<0 :> Delta^a * ((E^EulerGamma ScaleMu^2)/(4 Pi Delta))^(-b eps)
+  }];
 
 DRExpand[expr_, dim_] :=
   FCReplaceD[expr, D -> dim - 2 Epsilon] //
@@ -170,16 +187,15 @@ DRExpandScaleless[expr_, dim_, Delta_] :=
   expr // Collect[#, Delta, Simplify] & //
   PlusToList // Map[
     Switch[
-      SelectNotFree[#, Delta] /. {Delta^n_ :> n, 1 -> 0} /.
-        D -> 4 - 2 Epsilon // Simplify,
-      0, {0,#},
+      Exponent[#, Delta] /. D -> 4 - 2 Epsilon // Simplify,
+      0, {0,#}, (* do not change terms without Delta *)
       -Epsilon,
         SelectFree[#, Delta] //
         FCReplaceD[#, D -> dim - 2 Epsilon] & // Simplify //
         Normal@Series[ScaleMu^(-2Epsilon) Epsilon #, {Epsilon,0,0}] & //
         { # / Epsilon, - # / EpsilonIR } &,
       _, {0,0}
-    ]&
+    ] &
   ] // Apply[Plus];
 
 (* loop calculations *)
@@ -292,42 +308,59 @@ FPIntegrate[b_, expr_, x_, opts___?OptionQ] := Module[
   { xSum, int },
   xSum[n_] := Plus @@ Table[x[i], {i, 1, n}];
   int = expr /. x[b] -> 1 - xSum[b - 1];
-  For[i = b - 1, i > 0, i--,
-    int = Integrate[int, {x[i], 0, 1 - xSum[i - 1]}, opts]
-  ];
+  Do[
+    int = Integrate[int, {x[i], 0, 1 - xSum[i - 1]}, opts],
+    {i, b-1, 1, -1}];
   Gamma[b] int
 ];
 
 (* PlusDistribution *)
 
-PlusDistributionExplicit[F_, x_] := Module[
-  {xx},
-  F - DiracDelta[1-x] Integrate[F /. x -> xx, {xx, 0, 1}]
+(
+  PlusDistribution[Log[x_ * (1 - x_)]/(1 - x_)] =.;
+  PlusDistribution[PlusDistribution[F_]] := PlusDistribution[F];
+  PlusDistribution[f_ * PlusDistribution[F_]] := PlusDistribution[f * F];
+  PlusDistribution[DiracDelta[_]] := 0;
+  PlusDistribution[f_ * DiracDelta[_]] := 0;
+);
+
+PlusDistributionExplicit[expr_, x_] := Module[{xx},
+  expr /. PlusDistribution[F_] :> F - DiracDelta[1-x] Integrate[F /. x -> xx, {xx, 0, 1}]
 ];
 
-PlusDistributionExpand[expr_, x_] := Module[
-  { exprList,
-    InvF, LogF, PD,
-    xx, havePD, noPD},
-  exprList = expr // PowerExpand // Expand // PlusToList //
-    ReplaceAll@{(1-x)^-1 -> InvF, (x-1)^-1 -> -InvF, Log[1-x] -> LogF} //
-    ReplaceAll@{LogF^n_ InvF :> PD[n], LogF InvF -> PD[1], InvF -> PD[0]};
-  havePD = SelectNotFree[exprList, PD] //
-    Map[{SelectNotFree[#, PD] /. PD[n_] :> n, SelectFree[#, PD]} &] //
-    Map[If[(#[[2]] /. x -> 1) === 0,
-      PlusDistributionExplicit[#[[2]] Log[1-x]^#[[1]] / (1-x), x],
-      #[[2]] PlusDistribution[Log[1-x]^#[[1]] / (1-x)] - DiracDelta[1-x] Integrate[
-        Log[1-xx]^#[[1]] / (1-xx) *
-        ((#[[2]] /. x -> xx) - (#[[2]] /. x -> 1)),
-        {xx, 0, 1}]
-    ] &];
-  noPD = SelectFree[exprList, PD] //
-    Map[PlusDistributionExplicit[#, x] &];
-  Plus @@ havePD + Plus @@ noPD //
-    Collect[#, {DiracDelta[_], PlusDistribution[_], EpsilonIR^-1},
-      LogCombine /* (Collect[#, Log[_], Simplify] &)
-    ] &
-];
+PlusDistributionExpand[expr_, x_] :=
+  expr /. PlusDistribution[F_] :> Module[
+    { FList,
+      InvF, LogF, PD,
+      xx, havePD, noPD},
+    FList = F // 
+      ReplaceAll[log_Log /; !FreeQ[log,x] :> PowerExpand@log] // Expand // PlusToList //
+      ReplaceAll@{(1-x)^-1 -> InvF, (x-1)^-1 -> -InvF, Log[1-x] -> LogF} //
+      ReplaceAll@{LogF^n_ InvF :> PD[n], LogF InvF -> PD[1], InvF -> PD[0]};
+    havePD = SelectNotFree[FList, PD] //
+      Map[{SelectNotFree[#, PD] /. PD[n_] :> n, SelectFree[#, PD]} &] //
+      Map[If[(#[[2]] /. x -> 1) === 0,
+        PlusDistributionExplicit[PlusDistribution[#[[2]] Log[1-x]^#[[1]] / (1-x)], x],
+        #[[2]] PlusDistribution[Log[1-x]^#[[1]] / (1-x)] - DiracDelta[1-x] Integrate[
+          Log[1-xx]^#[[1]] / (1-xx) *
+          ((#[[2]] /. x -> xx) - (#[[2]] /. x -> 1)),
+          {xx, 0, 1}]
+      ] &];
+    noPD = SelectFree[FList, PD] //
+      Map[PlusDistributionExplicit[PlusDistribution[#], x] &];
+    Plus @@ havePD + Plus @@ noPD
+  ] //
+  Collect[#, {PlusDistribution[_], EpsilonIR, DiracDelta[_], Log[_]}, Simplify] &;
+
+PlusDistributionIntegrate[expr_, x_] :=
+  Collect[expr, {PlusDistribution[_], DiracDelta[_]}] // PlusToList //
+  Map[ReplaceAll@{
+    f_ * PlusDistribution[F_] :> Integrate[F (f - (f /. x -> 1)), {x,0,1}],
+    PlusDistribution[_] -> 0,
+    f_ * DiracDelta[1-x] :> (f /. x -> 1),
+    DiracDelta[1-x] -> 1,
+    f_ :> Integrate[f, {x,0,1}]
+  }] // Apply[Plus] // Simplify;
 
 End[];
 
