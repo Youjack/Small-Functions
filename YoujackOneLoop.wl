@@ -85,6 +85,9 @@ FPIntegrate::usage =
 
 (* PlusDistribution *)
 
+PlusDistributionFlattern::usage =
+  "PlusDistributionFlattern[expr] distributes and flatterns PlusDistributions in expr.";
+
 PlusDistributionExplicit::usage =
   "PlusDistributionExplicit[expr, x] explicitly calculates PlusDistributions of variable x in expr";
 
@@ -93,7 +96,7 @@ PlusDistributionExpand::usage =
   with in terms of PlusDistribution[Log[1-x]^n/(1-x)].";
 
 PlusDistributionIntegrate::usage =
-  "PlusDistributionIntegrate[expr, x] integrates expr (may involve PlusDistributions) w.r.t x from 0 to 1."
+  "PlusDistributionIntegrate[expr, x] integrates expr (may involve PlusDistributions) w.r.t x from 0 to 1.";
 
 Begin["`Private`"]; (*----------------------------------------------------------------------------*)
 
@@ -316,20 +319,23 @@ FPIntegrate[b_, expr_, x_, opts___?OptionQ] := Module[
 
 (* PlusDistribution *)
 
-(
-  PlusDistribution[Log[x_ * (1 - x_)]/(1 - x_)] =.;
-  PlusDistribution[PlusDistribution[F_]] := PlusDistribution[F];
-  PlusDistribution[f_ * PlusDistribution[F_]] := PlusDistribution[f * F];
-  PlusDistribution[DiracDelta[_]] := 0;
-  PlusDistribution[f_ * DiracDelta[_]] := 0;
-);
+PlusDistributionFlattern[expr_] := expr //. {
+  PlusDistribution[0] -> 0,
+  PlusDistribution[     DiracDelta[_]] -> 0,
+  PlusDistribution[f_ * DiracDelta[_]] -> 0,
+  PlusDistribution[     PlusDistribution[F_]] :> PlusDistribution[    F],
+  PlusDistribution[f_ * PlusDistribution[F_]] :> PlusDistribution[f * F],
+  PlusDistribution[F_] :> (
+    Collect[F, {PlusDistribution[_], DiracDelta[_]}] //
+    PlusDistribution // Distribute )
+};
 
 PlusDistributionExplicit[expr_, x_] := Module[{xx},
   expr /. PlusDistribution[F_] :> F - DiracDelta[1-x] Integrate[F /. x -> xx, {xx, 0, 1}]
 ];
 
 PlusDistributionExpand[expr_, x_] :=
-  expr /. PlusDistribution[F_] :> Module[
+  PlusDistributionFlattern[expr] /. PlusDistribution[F_] :> Module[
     { FList,
       InvF, LogF, PD,
       xx, havePD, noPD},
