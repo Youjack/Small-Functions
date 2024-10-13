@@ -8,12 +8,12 @@ $FAVerbose = 0;
 SetScatOptions::usage =
   "Set options for calculating scattering amplitudes:
   amplitudes are M without an \[ImaginaryI];
-  external lines are not truncated.";
+  external wave functions are not truncated.";
 
 Set1PIOptions::usage =
   "Set options for calculating 1PIs:
   amplitudes are M without an \[ImaginaryI];
-  external lines are truncated;
+  external wave functions are truncated;
   reducible diagrams are excluded.";
 
 (* auxiliary functions *)
@@ -23,7 +23,10 @@ LogCombine::usage =
   (and takes the factor in the coefficient into the log)."
 
 AddMassRegulator::usage = 
-  "AddMassRegulator[amp, m] add mass m to every massless propagator in amp.";
+  "AddMassRegulator[amp, m] adds mass m to every massless propagator in amp.";
+
+AddPropagatorIm::usage =
+  "AddPropagatorIm[amp, im] adds \[ImaginaryI] im to every propagator in amp.";
 
 Z2d::usage =
   "Z2d[expr, {{Z1,d1},{Z2,d2},...}] replaces Zi in expr with di,
@@ -47,7 +50,7 @@ DRAddScaleMu::usage =
   then replaces \[CapitalDelta]^(-\[Epsilon])\[Rule](\[ExponentialE]^\[Gamma] \[Mu]^2/(4\[Pi]\[CapitalDelta]))^\[Epsilon]";
 
 DRExpand::usage =
-  "DRExpand[expr, dim] replaces D\[Rule]dim-2\[Epsilon] in expr,
+  "DRExpand[expr, dim, eps:Epsilon] replaces D\[Rule]dim-2\[Epsilon] in expr,
   expands expr with respect to \[Epsilon],
   and returns {\[Epsilon] dependent part, \[Epsilon] independent part}.";
 
@@ -72,8 +75,10 @@ ReduceOneLoopNumr::usage =
   and returns {{a1 in (l^2)^a1, prefactor1},...}.";
 
 StdOneLoop::usage =
-  "StdOneLoop[b, FPNumr, \[CapitalDelta]] gives the standard one-loop integral.
-  (the final result have an implicit Feynman-parameters integral with Gamma[b])";
+  "StdOneLoop[b, Numr, \[CapitalDelta]] gives the standard one-loop integral
+  with integrand 1/(2\[Pi])^D Numr[[i,2]] (l^2)^Numr[[i,1]] / (l^2 - \[CapitalDelta])^b.
+  Euclidean\[Rule]True treats l as an Euclidean momentum
+  with integrand 1/(2\[Pi])^D Numr[[i,2]] (l^2)^Numr[[i,1]] / (l^2 + \[CapitalDelta])^b.";
 
 FPOneLoop::usage =
   "FPOneLoop[ampLoop, l, x, \[CapitalDelta]]
@@ -90,6 +95,9 @@ PlusDistributionFlattern::usage =
 
 PlusDistributionExplicit::usage =
   "PlusDistributionExplicit[expr, x] explicitly calculates PlusDistributions of variable x in expr";
+
+PlusDistributionFilter::usage =
+  "PlusDistributionFilter[expr, x] applies to expr the filtering property of PlusDistribution and DiracDelta w.r.t x.";
 
 PlusDistributionExpand::usage =
   "PlusDistributionExpand[expr, x] expands PlusDistributions of variable x in expr
@@ -151,6 +159,11 @@ LogCombine[expr_, factor_ : 1] := Module[
 AddMassRegulator[amp_, m_] :=
   FCI@amp /. PropagatorDenominator[p_, 0] :> PropagatorDenominator[p, m];
 
+AddPropagatorIm[amp_, im_] :=
+  FCI@amp /.
+    FeynAmpDenominator[prop__] :> 1 / Times[prop] /.
+    PropagatorDenominator[p_, m_] :> SPD[p] - m^2 + I im;
+
 Z2d[expr_, ZList_List] := Module[{c},
   expr //
   ReplaceAll[(#[[1]] -> 1 + c #[[2]]) & /@ ZList] //
@@ -164,7 +177,7 @@ BetaFromZ[ZgMS_, g_, dimg_] := Module[
   dimgg = ((dimg /. D -> D - 2Epsilon) - dimg // Simplify) / Epsilon;
   C1 = g SeriesCoefficient[ZgMS - 1, {Epsilon, Infinity, 1}];
   - Epsilon dimgg g - dimgg C1 + dimgg g D[C1, g]
-]
+];
 
 (* dimensional regularization *)
 
@@ -181,10 +194,10 @@ DRAddScaleMu[expr_, dim_, Delta_, eps_:Epsilon] :=
     Delta^(a_ + b_ * eps) /; b<0 :> Delta^a * ((E^EulerGamma ScaleMu^2)/(4 Pi Delta))^(-b eps)
   }];
 
-DRExpand[expr_, dim_] :=
-  FCReplaceD[expr, D -> dim - 2 Epsilon] //
-  Normal@Series[#, {Epsilon,0,0}] & //
-  {SelectNotFree2[#, Epsilon], SelectFree2[#, Epsilon]} & // Simplify;
+DRExpand[expr_, dim_, eps_:Epsilon] :=
+  FCReplaceD[expr, D -> dim - 2 eps] //
+  Normal@Series[#, {eps,0,0}] & //
+  {SelectNotFree2[#, eps], SelectFree2[#, eps]} & // Simplify;
 
 DRExpandScaleless[expr_, dim_, Delta_] :=
   expr // Collect[#, Delta, Simplify] & //
@@ -227,9 +240,8 @@ FPOneLoopDenom[denom_, l_, x_, Delta_] := Module[
   { momPart, massPart } = FCI[denom] // Apply[List, #, {0,1}] & // Transpose;
   b = Length@momPart;
   DataType[x, FCVariable] = True;
-  xSum = Sum[
-    DataType[x[i], FCVariable] = True;
-    x[i], {i, 1, b}];
+  DataType[x[i_], FCVariable] := True;
+  xSum = Sum[x[i], {i, 1, b}];
   (* Feynman parametrizes `momPart` and separates it into `lPart` and `DeltaMom` *)
   { lPart, DeltaMom } = MapIndexed[SPD[#1] Apply[x][#2] &, momPart] //
     Apply[Plus] // CompleteSquare[#, l] & // ReplaceAll[xSum -> 1] //
@@ -281,13 +293,13 @@ ReduceOneLoopNumr[numr_, lRule_Rule] := Module[
   Map[{#[[1, 1]], Plus@@(Transpose[#][[2]]) // Simplify} &]
 ];
 
-StdOneLoop[b_, FPNumr_, Delta_] :=
-  FCI[FPNumr] //
+StdOneLoop[b_, Numr_, Delta_, OptionsPattern[{Euclidean -> False}]] :=
+  FCI[Numr] //
   If[Head[#[[1]]] =!= List, {#}, #] & //
   (* calculate the standard one-loop integral *)
   Map@Replace[
     {a_, pref_} :>
-      I (-1)^(a-b) / (4Pi)^(D/2) Delta^(D/2+a-b) *
+      If[OptionValue[Euclidean], 1, I (-1)^(a-b)] / (4Pi)^(D/2) Delta^(D/2+a-b) *
       Gamma[-D/2-a+b] Gamma[D/2+a] /( Gamma[b] Gamma[D/2] ) pref
   ] //
   (* gather the results *)
@@ -331,8 +343,21 @@ PlusDistributionFlattern[expr_] := expr //. {
 };
 
 PlusDistributionExplicit[expr_, x_] := Module[{xx},
-  expr /. PlusDistribution[F_] :> F - DiracDelta[1-x] Integrate[F /. x -> xx, {xx, 0, 1}]
+  expr /. {
+    f_ * PlusDistribution[F_] :>
+      f F - DiracDelta[1-x] Integrate[(f /. x -> 1)(F /. x -> xx), {xx,0,1}],
+    PlusDistribution[F_] :>
+        F - DiracDelta[1-x] Integrate[              F /. x -> xx , {xx,0,1}]
+  }
 ];
+
+PlusDistributionFilter[expr_, x_] :=
+  Collect[expr, {PlusDistribution[_], DiracDelta[_]}] /. {
+    f_ * PlusDistribution[F_] :>
+      ((f - (f /. x -> 1)) F // Simplify) + (f /. x -> 1) PlusDistribution[F],
+    f_ * DiracDelta[1 - x] :>
+      (f /. x -> 1) DiracDelta[1 - x]
+  };
 
 PlusDistributionExpand[expr_, x_] :=
   PlusDistributionFlattern[expr] /. PlusDistribution[F_] :> Module[
@@ -423,6 +448,80 @@ DiracDecompose[expr_] := Module[
     ReplaceAll[GA[LI1_?(#=!=5&)].GA[LI2_?(#=!=5&)] :>
       ToDiracSigma[GA[LI1].GA[LI2], GA[LI1], GA[LI2]]] //
     FullSimplify // Expand
+];
+
+End[];
+
+EndPackage[];
+
+BeginPackage["YoujackOneLoop`LightFrontCoord`"]; (*===============================================*)
+Needs["FeynCalc`"];
+
+np::usage = "np is \!\(\*SubscriptBox[\(n\),\(+\)]\)";
+nm::usage = "nm is \!\(\*SubscriptBox[\(n\),\(-\)]\)";
+
+LFP::usage = "LFP[p] is \!\(\*SuperscriptBox[\(p\),\(+\)]\)";
+LFM::usage = "LFM[p] is \!\(\*SuperscriptBox[\(p\),\(-\)]\)";
+LFT::usage = "LFT[p] is \!\(\*SubscriptBox[\(p\),\(T\)]\)";
+
+SetLightFrontSP::usage =
+  "SetLightFrontSP[] sets SP and SPD in light-front coordinate.";
+
+LightFrontDecompose::usage =
+  "LightFrontDecompose[expr, p] or LightFrontDecompose[p] decomposes p into light-front components.
+  (p can be a List)"
+
+Begin["`Private`"];
+
+(* MakeBoxes *)
+
+MakeBoxes[np, TraditionalForm] := SubscriptBox["n","+"];
+MakeBoxes[nm, TraditionalForm] := SubscriptBox["n","-"];
+
+LFP /: MakeBoxes[LFP[p_], TraditionalForm] := SuperscriptBox[ToBoxes[p], "+"];
+LFM /: MakeBoxes[LFM[p_], TraditionalForm] := SuperscriptBox[ToBoxes[p], "-"];
+LFT /: MakeBoxes[LFT[p_], TraditionalForm] := SubscriptBox[ToBoxes[p], "T"];
+
+(* SP & SPD *)
+
+LFP[np] = 1; LFM[np] = 0; LFT[np] = 0;
+LFP[nm] = 0; LFM[nm] = 1; LFT[nm] = 0;
+LFP[LFT[p_]] := 0; LFM[LFT[p_]] := 0; LFT[LFT[p_]] := LFT[p];
+
+SetLightFrontSP[] := (
+  SP[np] = 0; SPD[np] = 0;
+  SP[nm] = 0; SPD[nm] = 0;
+  SP[np, nm] = 1; SPD[np, nm] = 1;
+
+  Pair[Momentum[np], Momentum[p_]] := LFM[p]; Pair[Momentum[np, D], Momentum[p_, D]] := LFM[p];
+  Pair[Momentum[nm], Momentum[p_]] := LFP[p]; Pair[Momentum[nm, D], Momentum[p_, D]] := LFP[p];
+
+  Pair[Momentum[np], Momentum[LFT[p_]]] := 0; Pair[Momentum[np, D], Momentum[LFT[p_], D]] := 0;
+  Pair[Momentum[nm], Momentum[LFT[p_]]] := 0; Pair[Momentum[nm, D], Momentum[LFT[p_], D]] := 0;
+);
+
+(* functions *)
+
+DataType[LFP[p_], FCVariable] := True;
+DataType[LFM[p_], FCVariable] := True;
+
+LFP[p_Plus] := Map[LFP, p];
+LFM[p_Plus] := Map[LFM, p];
+LFT[p_Plus] := Map[LFT, p];
+
+LFP[Times[arg1___, z_ * n_/;(NumberQ[n] || DataType[n, FCVariable]), arg2___]] :=
+  n LFP[Times[arg1, z, arg2]];
+LFM[Times[arg1___, z_ * n_/;(NumberQ[n] || DataType[n, FCVariable]), arg2___]] :=
+  n LFM[Times[arg1, z, arg2]];
+LFT[Times[arg1___, z_ * n_/;(NumberQ[n] || DataType[n, FCVariable]), arg2___]] :=
+  n LFT[Times[arg1, z, arg2]];
+
+LightFrontDecompose[p_][expr_] := LightFrontDecompose[expr, p];
+LightFrontDecompose[expr_, p_] := Module[
+  { pList, rules },
+  pList = If[Head@p === List, p, List@p];
+  rules = Map[# -> LFP[#] np + LFM[#] nm + LFT[#] &, pList];
+  FCReplaceMomenta[expr, rules]
 ];
 
 End[];
