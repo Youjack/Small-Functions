@@ -80,7 +80,9 @@ InteractiveMapAt::backat0 = "Already back to depth\[Hyphen]0.";
 InteractiveMapAt[fSeq___, OptionsPattern[{Print -> True}]][expr_] := Module[
   {
     fList, fListLen,
-    exprList, posList, exprP, fexprP, posString
+    exprList, posList, exprP, fexprP, posString,
+    LocalVarColor = RGBColor[0.235, 0.49, 0.568],
+    HeadColor = RGBColor[1., 0.72, 0.]
   },
   If[OddQ[fListLen = Length[fList = {fSeq}]],
     Message[InteractiveMapAt::wrongsize]; Abort[]];
@@ -117,9 +119,13 @@ InteractiveMapAt[fSeq___, OptionsPattern[{Print -> True}]][expr_] := Module[
       )
     ];
     If[OptionValue[Print], Print @@
-      posString ~Join~ {Head@exprP, List@@exprP} ~Join~
-      If[fList[[2 i]] === Identity, {},
-        {" \[Rule] ", Head@fexprP, List@@fexprP}] ],
+      (posString // Map[Style[#,LocalVarColor]&]) ~Join~
+      {Style[Head@exprP,HeadColor], Style[List@@exprP,Black]} ~Join~
+      If[fList[[2 i]] === Identity, {}, {
+        Style[" \[Rule] ",LocalVarColor],
+        Style[Head@fexprP,HeadColor], Style[List@@fexprP,Black]
+      }]
+    ],
     {i, fListLen/2}];
   Do[
     exprList[[i]] = Head[exprList[[i]]][
